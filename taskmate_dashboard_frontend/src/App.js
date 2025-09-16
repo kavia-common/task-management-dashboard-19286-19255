@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Header from "./components/Header";
 import MetricsCards from "./components/MetricsCards";
 import ControlsBar from "./components/ControlsBar";
@@ -29,7 +29,7 @@ function App() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
 
-  const refresh = async (opts = {}) => {
+  const refresh = useCallback(async (opts = {}) => {
     setLoading(true);
     setErrorMsg("");
     try {
@@ -45,18 +45,17 @@ function App() {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    // re-fetch when filters change
-    refresh({ status: statusFilter, search });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, search]);
+
+  useEffect(() => {
+    // initial fetch
+    refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    // re-fetch when filters change (covered via refresh deps)
+    refresh({ status: statusFilter, search });
+  }, [statusFilter, search, refresh]);
 
   const counts = useMemo(() => {
     const c = { total: tasks.length, todo: 0, in_progress: 0, completed: 0 };
