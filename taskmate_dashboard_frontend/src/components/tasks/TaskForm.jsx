@@ -27,6 +27,10 @@ export default function TaskForm({
     due_date: "",
   });
   const [errors, setErrors] = useState({});
+  const titleInputId = "task-title";
+  const descInputId = "task-description";
+  const statusSelectId = "task-status";
+  const dueDateId = "task-due-date";
 
   useEffect(() => {
     if (initial) {
@@ -38,6 +42,18 @@ export default function TaskForm({
       });
     }
   }, [initial]);
+
+  useEffect(() => {
+    // focus first field when mounting
+    const el = document.getElementById(titleInputId);
+    if (el) {
+      try {
+        el.focus();
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
 
   const validate = () => {
     const e = {};
@@ -62,31 +78,42 @@ export default function TaskForm({
       });
   };
 
+  const onKeyDown = (e) => {
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      onCancel && onCancel();
+    }
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} onKeyDown={onKeyDown} className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="sm:col-span-2">
-          <label className="block text-sm font-medium text-gray-700">
+          <label htmlFor={titleInputId} className="block text-sm font-medium text-gray-700">
             Title
           </label>
           <input
+            id={titleInputId}
             type="text"
             value={values.title}
             onChange={handleChange("title")}
             placeholder="Enter task title"
+            aria-invalid={errors.title ? "true" : "false"}
+            aria-describedby={errors.title ? `${titleInputId}-error` : undefined}
             className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 ${
               errors.title ? "border-red-300" : "border-gray-200"
             }`}
           />
           {errors.title && (
-            <p className="mt-1 text-xs text-red-600">{errors.title}</p>
+            <p id={`${titleInputId}-error`} className="mt-1 text-xs text-red-600">{errors.title}</p>
           )}
         </div>
         <div className="sm:col-span-2">
-          <label className="block text-sm font-medium text-gray-700">
+          <label htmlFor={descInputId} className="block text-sm font-medium text-gray-700">
             Description
           </label>
           <textarea
+            id={descInputId}
             rows={3}
             value={values.description}
             onChange={handleChange("description")}
@@ -95,10 +122,11 @@ export default function TaskForm({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">
+          <label htmlFor={statusSelectId} className="block text-sm font-medium text-gray-700">
             Status
           </label>
           <select
+            id={statusSelectId}
             value={values.status}
             onChange={handleChange("status")}
             className="mt-1 w-full rounded-lg border border-gray-200 bg-surface px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
@@ -109,10 +137,11 @@ export default function TaskForm({
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">
+          <label htmlFor={dueDateId} className="block text-sm font-medium text-gray-700">
             Due Date
           </label>
           <input
+            id={dueDateId}
             type="date"
             value={values.due_date || ""}
             onChange={handleChange("due_date")}
@@ -126,12 +155,14 @@ export default function TaskForm({
           type="button"
           onClick={onCancel}
           className="rounded-lg px-4 py-2 text-sm bg-gray-100 text-gray-700 hover:bg-gray-200"
+          aria-label="Cancel and close task form"
         >
           Cancel
         </button>
         <button
           type="submit"
           className="btn-primary rounded-lg px-4 py-2 text-sm"
+          aria-label={submitLabel}
         >
           {submitLabel}
         </button>

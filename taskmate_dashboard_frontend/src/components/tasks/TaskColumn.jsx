@@ -29,10 +29,10 @@ export default function TaskColumn({
   const count = tasks.length;
 
   return (
-    <div className="card">
+    <div className="card" role="region" aria-label={`${title} column`}>
       <div className={`flex items-center justify-between border-b pb-2 ${accentClass}`}>
         <h3 className="font-medium text-text">{title}</h3>
-        <span className="text-xs rounded-full px-2 py-0.5 bg-gray-100 text-gray-700">
+        <span className="text-xs rounded-full px-2 py-0.5 bg-gray-100 text-gray-700" aria-label={`${count} tasks`}>
           {count}
         </span>
       </div>

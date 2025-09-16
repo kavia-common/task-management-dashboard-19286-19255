@@ -68,6 +68,8 @@ export default function TaskCard({
             type="button"
             className="text-xs px-2 py-1 rounded-md bg-primary-50 text-primary hover:bg-blue-100"
             onClick={onEdit}
+            aria-label={`Edit task ${task.title}`}
+            title="Edit task"
           >
             Edit
           </button>
@@ -75,6 +77,8 @@ export default function TaskCard({
             type="button"
             className="text-xs px-2 py-1 rounded-md bg-error-50 text-error hover:bg-red-100"
             onClick={onDelete}
+            aria-label={`Delete task ${task.title}`}
+            title="Delete task"
           >
             Delete
           </button>

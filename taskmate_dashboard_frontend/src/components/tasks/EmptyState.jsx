@@ -13,9 +13,13 @@ import PropTypes from "prop-types";
  * - description: string
  * - action: React node (button or link)
  */
-export default function EmptyState({ icon = "🗂️", title, description, action }) {
+export default function EmptyState({ icon = "🗂️", title, description, action, live = false }) {
   return (
-    <div className="flex flex-col items-center justify-center text-center py-10">
+    <div
+      className="flex flex-col items-center justify-center text-center py-10"
+      role={live ? "status" : undefined}
+      aria-live={live ? "polite" : undefined}
+    >
       <div className="text-4xl mb-2" aria-hidden>{icon}</div>
       <h3 className="text-base font-semibold text-text">{title}</h3>
       {description && (
