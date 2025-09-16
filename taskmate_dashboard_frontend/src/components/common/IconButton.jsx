@@ -42,7 +42,7 @@ export default function IconButton({
     secondary:
       "bg-secondary text-white hover:bg-amber-600 shadow-soft",
     ghost:
-      "bg-transparent text-text hover:bg-blue-50",
+      "bg-transparent text-text hover:bg-primary-50",
     danger:
       "bg-error text-white hover:bg-red-600 shadow-soft",
   };

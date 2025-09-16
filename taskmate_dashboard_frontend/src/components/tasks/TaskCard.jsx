@@ -29,7 +29,7 @@ export default function TaskCard({
     due && due.setHours(0, 0, 0, 0) < new Date(today.setHours(0, 0, 0, 0)) && task.status !== "done";
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+    <div className="rounded-lg border border-gray-200 bg-surface p-3 shadow-soft">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h4 className="text-sm font-semibold text-text">{task.title}</h4>
@@ -53,7 +53,7 @@ export default function TaskCard({
               <span
                 className={`text-xs rounded-full px-2 py-0.5 ${
                   isOverdue
-                    ? "bg-red-50 text-red-700"
+                    ? "bg-error-50 text-error"
                     : "bg-gray-100 text-gray-700"
                 }`}
                 title={`Due ${task.due_date}`}
@@ -66,14 +66,14 @@ export default function TaskCard({
         <div className="flex items-center gap-1">
           <button
             type="button"
-            className="text-xs px-2 py-1 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100"
+            className="text-xs px-2 py-1 rounded-md bg-primary-50 text-primary hover:bg-blue-100"
             onClick={onEdit}
           >
             Edit
           </button>
           <button
             type="button"
-            className="text-xs px-2 py-1 rounded-md bg-red-50 text-red-700 hover:bg-red-100"
+            className="text-xs px-2 py-1 rounded-md bg-error-50 text-error hover:bg-red-100"
             onClick={onDelete}
           >
             Delete
