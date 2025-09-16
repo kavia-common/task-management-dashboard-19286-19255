@@ -8,5 +8,5 @@ html, body, #root {
 }
 
 body {
-  @apply bg-background text-gray-900;
+  @apply bg-background text-gray-900 antialiased;
 }
