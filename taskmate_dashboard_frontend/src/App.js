@@ -54,6 +54,7 @@ function App() {
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [uiError, setUiError] = useState(null);
 
   // Refs for focus management and live announcements
   const addButtonRef = useRef(null);
@@ -84,6 +85,7 @@ function App() {
 
   const handleSubmitForm = async (values) => {
     try {
+      setUiError(null);
       if (editing) {
         await updateTask(editing.id, values);
         announce(statusRegionRef, "Task updated");
@@ -97,8 +99,11 @@ function App() {
         addButtonRef.current && addButtonRef.current.focus();
       }, 0);
     } catch (e) {
-      // Announce error
-      announce(errorRegionRef, e?.message || "There was an error saving the task");
+      const msg = e?.message || "There was an error saving the task";
+      // Announce and show UI banner
+      setUiError(msg);
+      announce(errorRegionRef, msg);
+      // Keep form open so user can correct/retry
     }
   };
 
@@ -158,6 +163,26 @@ function App() {
           className="sr-only"
         />
 
+        {/* Inline error banner for operations */}
+        {uiError && (
+          <div
+            className="mb-4 rounded-lg border border-red-200 bg-error-50 p-3"
+            role="alert"
+            aria-live="assertive"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm text-red-700">{uiError}</p>
+              <button
+                type="button"
+                className="text-xs px-2 py-1 rounded-md bg-red-100 text-red-700 hover:bg-red-200"
+                onClick={() => setUiError(null)}
+                aria-label="Dismiss error"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
         {/* Metrics Section */}
         <section aria-labelledby="metrics-heading" className="mb-6">
           <div className="flex items-center justify-between mb-3">

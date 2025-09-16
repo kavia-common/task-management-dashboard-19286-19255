@@ -139,6 +139,15 @@ export async function createTask(payload) {
     throw new Error('createTask: "title" is required');
   }
 
+  // Clear and actionable error when env is not configured
+  const url = process.env.REACT_APP_SUPABASE_URL;
+  const key = process.env.REACT_APP_SUPABASE_KEY;
+  if (!url || !key) {
+    throw new Error(
+      "Supabase is not configured. Please set REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_KEY in your .env, then restart the app."
+    );
+  }
+
   const insertPayload = {
     title: payload.title,
     description: payload.description ?? null,
@@ -148,7 +157,13 @@ export async function createTask(payload) {
 
   const { data, error } = await supabase.from('tasks').insert(insertPayload).select('*').single();
   throwIfError(error, 'Failed to create task');
-  return data;
+  // Normalize to ensure expected fields exist
+  return {
+    ...data,
+    status: data?.status ?? 'todo',
+    description: typeof data?.description === 'string' ? data.description : data?.description ?? null,
+    due_date: data?.due_date ?? null,
+  };
 }
 
 // PUBLIC_INTERFACE

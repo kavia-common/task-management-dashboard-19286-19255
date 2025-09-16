@@ -27,6 +27,8 @@ export default function TaskForm({
     due_date: "",
   });
   const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
   const titleInputId = "task-title";
   const descInputId = "task-description";
   const statusSelectId = "task-status";
@@ -66,16 +68,28 @@ export default function TaskForm({
     setValues((v) => ({ ...v, [field]: e.target.value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitError(null);
     if (!validate()) return;
-    onSubmit &&
-      onSubmit({
+    if (!onSubmit) return;
+
+    try {
+      setSubmitting(true);
+      await onSubmit({
         title: values.title.trim(),
         description: values.description.trim() || null,
         status: values.status,
         due_date: values.due_date || null,
       });
+    } catch (err) {
+      const message =
+        err?.message ||
+        "An unexpected error occurred while saving. Please try again.";
+      setSubmitError(message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const onKeyDown = (e) => {
@@ -87,6 +101,17 @@ export default function TaskForm({
 
   return (
     <form onSubmit={handleSubmit} onKeyDown={onKeyDown} className="space-y-4">
+      {submitError && (
+        <div
+          className="rounded-lg border border-red-200 bg-error-50 p-3"
+          role="alert"
+          aria-live="assertive"
+        >
+          <p className="text-sm text-red-700">
+            {submitError}
+          </p>
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="sm:col-span-2">
           <label htmlFor={titleInputId} className="block text-sm font-medium text-gray-700">
@@ -103,6 +128,7 @@ export default function TaskForm({
             className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 ${
               errors.title ? "border-red-300" : "border-gray-200"
             }`}
+            disabled={submitting}
           />
           {errors.title && (
             <p id={`${titleInputId}-error`} className="mt-1 text-xs text-red-600">{errors.title}</p>
@@ -119,6 +145,7 @@ export default function TaskForm({
             onChange={handleChange("description")}
             placeholder="Add more details..."
             className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={submitting}
           />
         </div>
         <div>
@@ -130,6 +157,7 @@ export default function TaskForm({
             value={values.status}
             onChange={handleChange("status")}
             className="mt-1 w-full rounded-lg border border-gray-200 bg-surface px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={submitting}
           >
             <option value="todo">To Do</option>
             <option value="inprogress">In Progress</option>
@@ -146,6 +174,7 @@ export default function TaskForm({
             value={values.due_date || ""}
             onChange={handleChange("due_date")}
             className="mt-1 w-full rounded-lg border border-gray-200 bg-surface px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={submitting}
           />
         </div>
       </div>
@@ -154,17 +183,19 @@ export default function TaskForm({
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg px-4 py-2 text-sm bg-gray-100 text-gray-700 hover:bg-gray-200"
+          className="rounded-lg px-4 py-2 text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-60"
           aria-label="Cancel and close task form"
+          disabled={submitting}
         >
           Cancel
         </button>
         <button
           type="submit"
-          className="btn-primary rounded-lg px-4 py-2 text-sm"
+          className="btn-primary rounded-lg px-4 py-2 text-sm disabled:opacity-60"
           aria-label={submitLabel}
+          disabled={submitting}
         >
-          {submitLabel}
+          {submitting ? "Saving..." : submitLabel}
         </button>
       </div>
     </form>
