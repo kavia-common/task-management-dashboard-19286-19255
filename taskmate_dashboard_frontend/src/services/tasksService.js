@@ -217,6 +217,71 @@ export async function getMetrics() {
   };
 }
 
+/**
+ * PUBLIC_INTERFACE
+ * subscribeToTasks
+ *
+ * Create a real-time channel subscription for Postgres changes on "public.tasks".
+ * Consumers pass an onEvent callback to receive { type: 'INSERT'|'UPDATE'|'DELETE', new|old } payloads.
+ * Returns an unsubscribe function to remove the channel.
+ */
+export function subscribeToTasks(onEvent) {
+  /** @type {import('@supabase/supabase-js').RealtimeChannel | null} */
+  const channel = supabase
+    .channel('realtime:tasks')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'tasks' },
+      (payload) => {
+        try {
+          if (typeof onEvent === 'function') {
+            // Normalize event shape
+            const evt = {
+              type: payload.eventType,
+              new: payload.new,
+              old: payload.old,
+            };
+            onEvent(evt);
+          }
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error('[Supabase] Error in tasks onEvent handler:', err);
+        }
+      }
+    )
+    .subscribe((status) => {
+      // optional status listener
+      if (status === 'SUBSCRIBED') {
+        // eslint-disable-next-line no-console
+        console.info('[Supabase] Subscribed to tasks realtime channel');
+      }
+    });
+
+  return () => {
+    try {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('[Supabase] Failed to remove tasks channel', e);
+    }
+  };
+}
+
+/**
+ * PUBLIC_INTERFACE
+ * isRealtimeAvailable
+ *
+ * Returns a boolean indicating if Supabase URL/Key seem configured.
+ * This is a heuristic to decide whether to rely on realtime or use refresh fallback.
+ */
+export function isRealtimeAvailable() {
+  const url = process.env.REACT_APP_SUPABASE_URL;
+  const key = process.env.REACT_APP_SUPABASE_KEY;
+  return Boolean(url && key);
+}
+
 export default {
   listTasks,
   getTask,
@@ -224,4 +289,6 @@ export default {
   updateTask,
   deleteTask,
   getMetrics,
+  subscribeToTasks,
+  isRealtimeAvailable,
 };
