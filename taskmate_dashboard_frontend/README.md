@@ -174,6 +174,7 @@ Recommended next steps:
   - Verify REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_KEY are set correctly in .env.
   - Ensure your Supabase table is named tasks in the public schema and that Row Level Security (RLS) policies allow the operations you need for anon users (or authenticate accordingly).
   - Confirm Realtime is enabled if you expect live updates. Otherwise, use the Refresh button in the Dashboard section.
+  - If you see an error like “column tasks.status does not exist”: Your connected database likely lacks the status column. The app now degrades gracefully by skipping status-based metrics, but for full functionality you should align your schema with the “Assumed Supabase Schema for public.tasks” section (add status text not null default 'todo' and due_date date if you want due metrics).
 
 - Styling not applied:
   - Ensure Tailwind is processing your files. tailwind.config.js content paths include ./public/index.html and ./src/**/*.{js,jsx,ts,tsx}. If you add files elsewhere, update the config.

@@ -5,10 +5,10 @@ import { supabase } from '../lib/supabaseClient';
  * @property {string|number} id - Unique task identifier (uuid or serial as per DB).
  * @property {string} title - Task title.
  * @property {string} [description] - Optional task description.
- * @property {('todo'|'inprogress'|'done'|string)} status - Task status.
+ * @property {('todo'|'inprogress'|'done'|string)} [status] - Task status. Note: Some databases may not have this column; UI and metrics handle missing gracefully.
  * @property {string|null} [due_date] - ISO date string (YYYY-MM-DD) or null.
- * @property {string} created_at - ISO datetime string of creation.
- * @property {string} updated_at - ISO datetime string of last update.
+ * @property {string} [created_at] - ISO datetime string of creation.
+ * @property {string} [updated_at] - ISO datetime string of last update.
  */
 
 /**
@@ -41,6 +41,8 @@ import { supabase } from '../lib/supabaseClient';
 
 /**
  * Build a Supabase query for the tasks table with common filters.
+ * If the connected DB lacks certain columns (e.g., 'status'), Supabase will error on filters/orders for that column.
+ * We try to avoid adding such filters unless requested by the UI.
  * @param {ListTasksParams} [params]
  */
 function buildListQuery(params = {}) {
@@ -74,6 +76,29 @@ function throwIfError(error, context) {
     e.cause = error;
     throw e;
   }
+}
+
+/**
+ * Check whether a given column exists on public.tasks by attempting a HEAD select for that column.
+ * We use a cheap query with head: true and expect no data, just error/no-error signaling.
+ * Returns true if the column is selectable, false if not.
+ * Note: Supabase PostgREST returns an error with code "PGRST204" (unknown column) or a Postgres error when column doesn't exist.
+ */
+async function checkColumnExists(columnName) {
+  const { error } = await supabase
+    .from('tasks')
+    .select(columnName, { head: true, count: 'exact' })
+    .limit(1);
+
+  if (!error) return true;
+
+  const msg = (error.message || '').toLowerCase();
+  // Heuristic match for unknown column errors
+  if (msg.includes('column') && msg.includes('does not exist')) {
+    return false;
+  }
+  // Other errors (like permission issues) should not be treated as column missing
+  return true;
 }
 
 // PUBLIC_INTERFACE
@@ -164,7 +189,6 @@ export async function deleteTask(id) {
     throw new Error('deleteTask: "id" is required');
   }
 
-  // Return deleted row(s) if needed; here we only return success boolean
   const { error } = await supabase.from('tasks').delete().eq('id', id);
   throwIfError(error, `Failed to delete task with id=${id}`);
   return true;
@@ -173,10 +197,10 @@ export async function deleteTask(id) {
 // PUBLIC_INTERFACE
 export async function getMetrics() {
   /**
-   * Fetch dashboard metrics:
-   * - statusCounts: count per status
-   * - dueToday: tasks due today
-   * - overdue: tasks with due_date before today and not done
+   * Fetch dashboard metrics in a resilient manner:
+   * - If 'status' column is missing -> statusCounts = {}
+   * - If 'due_date' column is missing -> dueToday = 0, overdue = 0
+   * This prevents runtime failures when the connected Supabase DB schema differs from the expected one.
    * @returns {Promise<TaskMetrics>}
    */
   const today = new Date();
@@ -185,36 +209,72 @@ export async function getMetrics() {
   const dd = String(today.getDate()).padStart(2, '0');
   const todayStr = `${yyyy}-${mm}-${dd}`;
 
-  // Status counts: group by status using RPC if available; otherwise fetch and reduce.
-  // Since generic SQL RPC might not exist, do a lightweight select of only status.
-  const [statusRes, dueTodayRes, overdueRes] = await Promise.all([
-    supabase.from('tasks').select('status'),
-    supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('due_date', todayStr),
-    // Overdue: due_date < today and status != 'done'
-    supabase
-      .from('tasks')
-      .select('id', { count: 'exact', head: true })
-      .lt('due_date', todayStr)
-      .neq('status', 'done'),
+  // Probe schema capabilities
+  const [hasStatus, hasDueDate] = await Promise.all([
+    checkColumnExists('status'),
+    checkColumnExists('due_date'),
   ]);
 
-  // Handle errors separately for clarity
-  throwIfError(statusRes.error, 'Failed to fetch status list for metrics');
-  throwIfError(dueTodayRes.error, 'Failed to fetch due today count');
-  throwIfError(overdueRes.error, 'Failed to fetch overdue count');
-
   /** @type {Record<string, number>} */
-  const statusCounts = {};
-  (statusRes.data || []).forEach((row) => {
-    const key = row.status ?? 'unknown';
-    statusCounts[key] = (statusCounts[key] || 0) + 1;
-  });
+  let statusCounts = {};
+  let dueToday = 0;
+  let overdue = 0;
 
-  return {
-    statusCounts,
-    dueToday: typeof dueTodayRes.count === 'number' ? dueTodayRes.count : 0,
-    overdue: typeof overdueRes.count === 'number' ? overdueRes.count : 0,
-  };
+  // Compute statusCounts if column exists
+  if (hasStatus) {
+    const { data: statusData, error: statusErr } = await supabase.from('tasks').select('status');
+    if (statusErr) {
+      // If selecting status fails for other reasons (e.g., permissions), degrade gracefully
+      // but include context in console for developers.
+      // eslint-disable-next-line no-console
+      console.warn('[Metrics] Failed to fetch status list for metrics (continuing with empty):', statusErr.message);
+      statusCounts = {};
+    } else {
+      statusCounts = {};
+      (statusData || []).forEach((row) => {
+        const key = row.status ?? 'unknown';
+        statusCounts[key] = (statusCounts[key] || 0) + 1;
+      });
+    }
+  } else {
+    // eslint-disable-next-line no-console
+    console.warn("[Metrics] 'status' column not found on tasks; returning empty statusCounts");
+    statusCounts = {};
+  }
+
+  // Compute dueToday/overdue if due_date exists
+  if (hasDueDate) {
+    const dueTodayQuery = supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('due_date', todayStr);
+
+    // For overdue we need to filter out 'done' if status exists, otherwise just count due_date < today
+    const overdueQueryBase = supabase.from('tasks').select('id', { count: 'exact', head: true }).lt('due_date', todayStr);
+    const overdueQuery = hasStatus ? overdueQueryBase.neq('status', 'done') : overdueQueryBase;
+
+    const [dueTodayRes, overdueRes] = await Promise.all([dueTodayQuery, overdueQuery]);
+
+    if (dueTodayRes.error) {
+      // eslint-disable-next-line no-console
+      console.warn('[Metrics] Failed to fetch due today count (defaulting to 0):', dueTodayRes.error.message);
+      dueToday = 0;
+    } else {
+      dueToday = typeof dueTodayRes.count === 'number' ? dueTodayRes.count : 0;
+    }
+
+    if (overdueRes.error) {
+      // eslint-disable-next-line no-console
+      console.warn('[Metrics] Failed to fetch overdue count (defaulting to 0):', overdueRes.error.message);
+      overdue = 0;
+    } else {
+      overdue = typeof overdueRes.count === 'number' ? overdueRes.count : 0;
+    }
+  } else {
+    // eslint-disable-next-line no-console
+    console.warn("[Metrics] 'due_date' column not found on tasks; dueToday and overdue default to 0");
+    dueToday = 0;
+    overdue = 0;
+  }
+
+  return { statusCounts, dueToday, overdue };
 }
 
 /**
@@ -250,7 +310,6 @@ export function subscribeToTasks(onEvent) {
       }
     )
     .subscribe((status) => {
-      // optional status listener
       if (status === 'SUBSCRIBED') {
         // eslint-disable-next-line no-console
         console.info('[Supabase] Subscribed to tasks realtime channel');
